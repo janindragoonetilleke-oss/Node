@@ -52,7 +52,13 @@ impl ListenerHandler for ListenerHandlerReal {
         } else {
             Ipv4Addr::LOCALHOST
         });
-        self.listener.bind(SocketAddr::new(ip_addr, port))
+        let addr = SocketAddr::new(ip_addr, port);
+        println!("DEBUG: ListenerHandlerReal binding to {:?}", addr);
+        let result = self.listener.bind(addr);
+        if let Err(ref e) = result {
+            println!("DEBUG: ListenerHandlerReal bind ERROR on {:?}: {:?}", addr, e);
+        }
+        result
     }
 
     fn bind_subs(&mut self, add_stream_sub: Recipient<AddStreamMsg>) {

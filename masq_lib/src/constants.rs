@@ -8,8 +8,8 @@ pub const DEFAULT_CHAIN: Chain = Chain::BaseMainnet;
 pub const CURRENT_SCHEMA_VERSION: usize = 13;
 
 pub const HIGHEST_RANDOM_CLANDESTINE_PORT: u16 = 9999;
-pub const HTTP_PORT: u16 = 80;
-pub const TLS_PORT: u16 = 443;
+pub const HTTP_PORT: u16 = 8080;
+pub const TLS_PORT: u16 = 8443;
 pub const LOWEST_USABLE_INSECURE_PORT: u16 = 1025;
 pub const HIGHEST_USABLE_PORT: u16 = 65535;
 pub const DEFAULT_UI_PORT: u16 = 5333;
@@ -134,8 +134,8 @@ mod tests {
     fn constants_have_correct_values() {
         assert_eq!(DEFAULT_CHAIN, Chain::BaseMainnet);
         assert_eq!(HIGHEST_RANDOM_CLANDESTINE_PORT, 9999);
-        assert_eq!(HTTP_PORT, 80);
-        assert_eq!(TLS_PORT, 443);
+        assert_eq!(HTTP_PORT, 8080);
+        assert_eq!(TLS_PORT, 8443);
         assert_eq!(LOWEST_USABLE_INSECURE_PORT, 1025);
         assert_eq!(HIGHEST_USABLE_PORT, 65535);
         assert_eq!(DEFAULT_UI_PORT, 5333);

@@ -45,7 +45,7 @@ use masq_lib::logger::log_broadcast_substitution_in_tests::prepare_log_recipient
 use masq_lib::logger::prepare_log_recipient;
 use masq_lib::logger::Logger;
 use masq_lib::ui_gateway::{NodeFromUiMessage, NodeToUiMessage};
-use masq_lib::utils::{exit_process, AutomapProtocol};
+use masq_lib::utils::AutomapProtocol;
 use std::net::{IpAddr, Ipv4Addr};
 use std::path::Path;
 
@@ -257,7 +257,12 @@ impl ActorSystemFactoryToolsReal {
     }
 
     fn handle_automap_error(prefix: &str, error: AutomapError) {
-        exit_process(1, &format!("Automap failure: {}{:?}", prefix, error));
+        warning!(
+            Logger::new("ActorSystemFactory"),
+            "Automap failure: {}{:?}; continuing without automap",
+            prefix,
+            error
+        );
     }
 
     fn maybe_save_usual_protocol(
@@ -298,9 +303,10 @@ impl ActorSystemFactoryToolsReal {
             }
             let change_handler = move |change: AutomapChange| match change {
                 AutomapChange::NewIp(new_public_ip) => {
-                    exit_process(
-                        1,
-                        format!("IP change to {} reported from ISP. We can't handle that until GH-499. Going down...", new_public_ip).as_str(),
+                    warning!(
+                        Logger::new("ActorSystemFactory"),
+                        "IP change to {} reported from ISP. Continuing...",
+                        new_public_ip
                     );
                 }
                 AutomapChange::Error(e) => Self::handle_housekeeping_thread_error(e),

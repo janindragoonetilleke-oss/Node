@@ -476,6 +476,9 @@ impl Future for Bootstrapper {
     fn poll(&mut self) -> Result<Async<<Self as Future>::Item>, <Self as Future>::Error> {
         // TODO: The config parameter below doesn't appear to be used. At any rate, it should probably be self.config, not a new object.
         try_ready!(CrashTestDummy::new(self.config.crash_point).poll());
+        if self.listener_handlers.is_empty() {
+            return Ok(Async::NotReady);
+        }
         try_ready!(self.listener_handlers.poll());
         Ok(Async::Ready(()))
     }
@@ -503,9 +506,10 @@ impl ConfiguredByPrivilege for Bootstrapper {
                 if let Err(e) =
                     listener_handler.bind_port_and_configuration(*port, port_configuration.clone())
                 {
-                    panic!("Could not listen on port {}: {}", port, e)
+                    println!("Warning: Could not listen on port {}: {}", port, e);
+                } else {
+                    self.listener_handlers.push(listener_handler);
                 }
-                self.listener_handlers.push(listener_handler);
             });
         Ok(())
     }
@@ -622,7 +626,7 @@ impl Bootstrapper {
                 let mut persistent_config = PersistentConfigurationReal::new(Box::new(config_dao));
                 let clandestine_port = self.establish_clandestine_port(&mut persistent_config);
                 let mut listener_handler = self.listener_handler_factory.make();
-                listener_handler
+                if let Err(e) = listener_handler
                     .bind_port_and_configuration(
                         clandestine_port,
                         PortConfiguration {
@@ -632,8 +636,11 @@ impl Bootstrapper {
                             is_clandestine: true,
                         },
                     )
-                    .expect("Failed to bind ListenerHandler to clandestine port");
-                self.listener_handlers.push(listener_handler);
+                {
+                    println!("Warning: Failed to bind clandestine port: {}", e);
+                } else {
+                    self.listener_handlers.push(listener_handler);
+                }
                 self.config.neighborhood_config.mode = NeighborhoodMode::Standard(
                     NodeAddr::new(&node_addr.ip_addr(), &[clandestine_port]),
                     neighbor_configs.clone(),

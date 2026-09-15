@@ -23,7 +23,7 @@ use std::io::ErrorKind;
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 use std::path::Path;
 use std::{fs, vec};
-use tokio::net::TcpListener;
+use std::net::TcpListener;
 
 pub const DATABASE_FILE: &str = "node-data.db";
 
@@ -498,7 +498,7 @@ impl DbInitializerReal {
 
     pub fn choose_clandestine_port() -> u16 {
         let mut rng = SmallRng::from_entropy();
-        loop {
+        for _ in 0..1000 {
             let candidate_port: u16 =
                 rng.gen_range(LOWEST_USABLE_INSECURE_PORT..HIGHEST_RANDOM_CLANDESTINE_PORT);
             match TcpListener::bind(&SocketAddr::V4(SocketAddrV4::new(
@@ -509,6 +509,7 @@ impl DbInitializerReal {
                 Err(_) => continue,
             }
         }
+        2179
     }
 
     fn set_config_value(
@@ -702,7 +703,7 @@ mod tests {
     use std::ops::Not;
     use std::path::PathBuf;
     use std::sync::{Arc, Mutex};
-    use tokio::net::TcpListener;
+    use std::net::TcpListener;
 
     #[test]
     fn constants_have_correct_values() {

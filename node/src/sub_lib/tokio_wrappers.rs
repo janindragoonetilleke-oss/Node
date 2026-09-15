@@ -47,7 +47,24 @@ impl TokioListenerWrapper for TokioListenerWrapperReal {
                 self.delegate = Some(tcp_listener);
                 Ok(())
             }
-            Err(e) => Err(e),
+            Err(e) => {
+                println!("DEBUG: tokio::net::TcpListener::bind failed for {:?}: {:?}", addr, e);
+                // Attempt fallback to std::net::TcpListener
+                let std_listener = std::net::TcpListener::bind(&addr)?;
+                std_listener.set_nonblocking(true)?;
+                let handle = tokio::reactor::Handle::default();
+                match TcpListener::from_std(std_listener, &handle) {
+                    Ok(tcp_listener) => {
+                        println!("DEBUG: fallback to std::net::TcpListener succeeded for {:?}", addr);
+                        self.delegate = Some(tcp_listener);
+                        Ok(())
+                    }
+                    Err(e2) => {
+                        println!("DEBUG: fallback from_std failed: {:?}", e2);
+                        Err(e) // return original error
+                    }
+                }
+            }
         }
     }
 

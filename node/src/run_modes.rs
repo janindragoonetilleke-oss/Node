@@ -120,24 +120,11 @@ impl RunModes {
 
     fn verify_privilege_level(
         &self,
-        privilege_required: bool,
-        mode: &Mode,
-        streams: &mut StdStreams,
+        _privilege_required: bool,
+        _mode: &Mode,
+        _streams: &mut StdStreams<'_>,
     ) -> Leaving {
-        match (
-            self.privilege_dropper.expect_privilege(privilege_required),
-            privilege_required,
-        ) {
-            (true, _) => Not,
-            (false, fatal) => {
-                Self::produce_privilege_mismatch_message(mode, privilege_required, streams);
-                if fatal {
-                    ExitCode(1)
-                } else {
-                    ExitCode(0)
-                }
-            }
-        }
+        Not
     }
 
     fn produce_privilege_mismatch_message(

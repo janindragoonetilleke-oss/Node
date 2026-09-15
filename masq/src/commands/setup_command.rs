@@ -109,20 +109,16 @@ impl SetupCommand {
                 .expect("String comparison failed")
         });
         short_writeln!(stdout, "{:29} {:64} {}", "NAME", "VALUE", "STATUS");
-        let chain_and_data_dir =
-            |p: &UiSetupResponseValue| (p.name.to_owned(), (p.value.clone(), p.status));
-        let chain = inner
+        let chain_status = inner
             .values
             .iter()
             .find(|&p| p.name.as_str() == "chain")
-            .map(chain_and_data_dir)
-            .expect("Chain name is missing in setup cluster!");
-        let data_directory = inner
+            .map(|p| p.status);
+        let data_directory_status = inner
             .values
             .iter()
             .find(|&p| p.name.as_str() == "data-directory")
-            .map(chain_and_data_dir)
-            .expect("data-directory is missing in setup cluster!");
+            .map(|p| p.status);
 
         inner.values.into_iter().for_each(|value| {
             short_writeln!(
@@ -147,13 +143,15 @@ impl SetupCommand {
                 "NOTE: no changes were made to the setup because the Node is currently running.\n"
             );
         }
-        if chain.1 .1 != UiSetupResponseValueStatus::Default
-            || data_directory.1 .1 != UiSetupResponseValueStatus::Default
-        {
-            short_writeln!(
-                stdout,
-                "NOTE: your data directory was modified to match the chain parameter.\n"
-            );
+        if let (Some(chain_st), Some(data_dir_st)) = (chain_status, data_directory_status) {
+            if chain_st != UiSetupResponseValueStatus::Default
+                || data_dir_st != UiSetupResponseValueStatus::Default
+            {
+                short_writeln!(
+                    stdout,
+                    "NOTE: your data directory was modified to match the chain parameter.\n"
+                );
+            }
         }
     }
 }

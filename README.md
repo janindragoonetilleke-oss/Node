@@ -2,453 +2,490 @@
 
 <div align="center">
 
-![ci-matrix](https://github.com/MASQ-Project/Node/workflows/ci-matrix/badge.svg)
+[![ci-matrix](https://github.com/MASQ-Project/Node/workflows/ci-matrix/badge.svg)](https://github.com/MASQ-Project/Node/actions)
 [![GitHub Release](https://img.shields.io/github/v/release/MASQ-Project/Node?display_name=release&color=green)](https://github.com/MASQ-Project/Node/releases/latest)
 [![Discord](https://badgen.net/badge/icon/discord?icon=discord&label)](https://discord.gg/masq)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
+[![Rust](https://img.shields.io/badge/rust-1.63%2B-orange.svg)](https://www.rust-lang.org)
 
 </div>
 
-MASQ Node combines the benefits of VPN and Tor technology, to create superior next-generation privacy software, where 
-users are rewarded for supporting an uncensored, global Web.  Users gain privacy and anonymity, while helping promote 
-Internet Freedom.
+**MASQ Node** forms the foundation of the MASQ Network: an open-source decentralized mesh-network (dMN) combining the benefits of VPN and Tor technology to create next-generation privacy software. Users are rewarded with **$MASQ** utility tokens for allocating spare computing resources and bandwidth to support an uncensored, borderless, and privacy-preserving global Web.
 
-## Purpose
-**MASQ Node** forms the foundation of the MASQ Network.
+---
 
-The MASQ Network is an open-source decentralized mesh-network (dMN) that allows any user to allocate spare computing resources to make the Internet
-a free and fair place for the entire world. It is a worldwide collection of Nodes that securely delivers content without
-the need of a VPN or Tor.
+## Table of Contents
+- [Overview](#overview)
+- [Key Features](#key-features)
+- [Architecture](#architecture)
+  - [System Workflow](#system-workflow)
+  - [Daemon vs. Node Security Model](#daemon-vs-node-security-model)
+  - [Workspace Subprojects](#workspace-subprojects)
+  - [Internal Node Subsystems](#internal-node-subsystems)
+- [Prerequisites & Supported Platforms](#prerequisites--supported-platforms)
+- [Building from Source](#building-from-source)
+- [Quick Start Guide](#quick-start-guide)
+  - [1. Starting the MASQ Daemon](#1-starting-the-masq-daemon)
+  - [2. Setting up Wallets and Password](#2-setting-up-wallets-and-password)
+  - [3. Configuring and Starting the Node](#3-configuring-and-starting-the-node)
+  - [4. Routing Traffic (Proxy & DNS Subversion)](#4-routing-traffic-proxy--dns-subversion)
+  - [5. Clean Shutdown](#5-clean-shutdown)
+- [Configuration Reference](#configuration-reference)
+  - [Configuration Priority](#configuration-priority)
+  - [Configuration Parameters](#configuration-parameters)
+  - [Node Descriptor Format](#node-descriptor-format)
+  - [Sample `config.toml`](#sample-configtoml)
+- [CLI Reference (`masq`)](#cli-reference-masq)
+- [Testing](#testing)
+- [Troubleshooting & Diagnostics](#troubleshooting--diagnostics)
+  - [Port 53 Binding Failures](#port-53-binding-failures)
+  - [TLS Alerts & Routing Errors](#tls-alerts--routing-errors)
+  - [Router NAT & Port Forwarding](#router-nat--port-forwarding)
+- [Component Documentation](#component-documentation)
+- [Origin & Attribution](#origin--attribution)
+- [License](#license)
 
-Because there's no single authority delivering or monitoring content, censorship and geo-restricted sites won't be an
-issue on the MASQ Network. It doesn't matter where you live or what content you're accessing, everyone in the world
-sees the exact same content.
+---
 
-MASQ Node software is what the average user runs to earn $MASQ utility tokens and dedicate some of their computers' 
-resources toward the Network - users can be rewarded with $MASQ for each time they serve content.
+## Overview
 
-MASQ Nodes work together through the mesh network to relay digital content.
-When a user requests a site, Nodes use a routing algorithm to find the most expedient and secure way to get the
-information to that user. Multiple Nodes work together to route a single request in order to maintain a necessary level of
-anonymity.
+Traditional VPNs suffer from centralized trust, single points of failure, and vulnerability to geographic IP blocking. Tor provides anonymity but relies on volunteer exit nodes and lacks built-in economic incentives for high-speed bandwidth relaying.
 
-__Important Note:__ Please remember that at the moment the MASQ Node is in development and is not clandestine. Your
-traffic can't be decrypted, and it is difficult to trace to you; but it is currently very easy for someone sniffing
-your Internet connection to tell that you're using some form of Peer networking. Please don't use it for any kind of sensitive traffic at this 
-stage - MASQ Network and it's developers are not responsible for any activity, or loss incurred, while using this beta software.
+**MASQ Node** provides a hybrid decentralized model:
+- **Decentralized Mesh Routing:** Data requests are split and forwarded across dynamic multi-hop paths via peer Nodes.
+- **Incentivized Relays:** Nodes that route data and provide exit bandwidth earn $MASQ tokens via micro-transactions settled across supported EVM blockchains (Ethereum, Base, and Polygon).
+- **Censorship Evasion:** With no central server infrastructure or static IP ranges, traffic resists DNS filtering, deep packet inspection (DPI), and geo-restrictions.
 
-## Source
-The MASQ project was forked from Substratum's Node project in order to carry on development after Substratum ceased 
-operations in October of 2019. In 2021, Substratum's Node repositories were removed from GitHub, so the fork link
-with MASQ was broken, but all credit for the original idea and the original design belongs to Substratum (and properly attributed through GPLv3 license) 
+> [!IMPORTANT]
+> **Beta Disclaimer:** MASQ Node software is in active development. While traffic payload is encrypted and cannot be deciphered in transit, network metadata analysis on local ISP connections can indicate peer-to-peer mesh traffic. Do not use for high-risk or life-critical privacy activities.
 
-## Running the MASQ Node
+---
 
-### MASQ Node Knowledge Base
-A [Knowledge Base](https://docs.masq.ai/masq) and testing resources are being refined for users with various 
-levels of technical ability.
+## Key Features
 
-There you can find further information, guides and configuration examples for running MASQ Node from:
-- [MASQ Browser](https://masqbrowser.com)
-- CLI
-- Docker image
+- **Multi-Hop CORES Packaging:** Encapsulates traffic inside layered, multi-hop encrypted CORES packets (similar to onion routing). Intermediate relay nodes cannot inspect payloads or endpoints.
+- **Zero-Knowledge DNS Resolution:** Intercepts local DNS requests and securely resolves them across the mesh via uncensored exit nodes, neutralizing DNS-level ISP hijacking and poisoning.
+- **Multi-Chain EVM Accounting:** Supports real-time balance tracking, debt limits, and settlements across **Ethereum Mainnet**, **Base Mainnet**, **Polygon Mainnet**, and testnets (**Base Sepolia**, **Polygon Amoy**).
+- **Dual Privilege Architecture:** Separation into a privileged Daemon (bound to `localhost`) and an unprivileged Node process that drops root permissions immediately after binding low ports.
+- **Automated NAT Traversal:** Built-in router port mapping (`automap`) supporting UPnP, NAT-PMP, and PCP.
+- **Multiple Interfaces:** Can be managed via graphical UI ([MASQ Browser](https://masqbrowser.com)), command-line interface (`masq`), or headless automated daemon.
 
-If you are interested in testing stages, speak to the team in the official [Discord channel](https://discord.gg/masq)
+---
 
-### MASQ Node Component README.md files
-To help navigate the codebase, here are the README.md links for all documented components
+## Architecture
 
-- [Blockchain-Service-URL](https://github.com/MASQ-Project/Node/blob/master/node/docs/Blockchain-Service.md)
-- [sub_lib](https://github.com/MASQ-Project/Node/blob/master/node/src/sub_lib/README.md)
-- [proxy_server](https://github.com/MASQ-Project/Node/blob/master/node/src/proxy_server/README.md)
-- [test_utils](https://github.com/MASQ-Project/Node/blob/master/node/src/test_utils/README.md)
-- [ui_gateway](https://github.com/MASQ-Project/Node/blob/master/node/src/ui_gateway/README.md)
-- [accountant](https://github.com/MASQ-Project/Node/blob/master/node/src/accountant/README.md)
-- [proxy_client](https://github.com/MASQ-Project/Node/blob/master/node/src/proxy_client/README.md)
-- [entry_dns](https://github.com/MASQ-Project/Node/blob/master/node/src/entry_dns/README.md)
-- [hopper](https://github.com/MASQ-Project/Node/blob/master/node/src/hopper/README.md)
-- [neighborhood](https://github.com/MASQ-Project/Node/blob/master/node/src/neighborhood/README.md)
-- [multinode_integration_tests](https://github.com/MASQ-Project/Node/blob/master/multinode_integration_tests/tests/README.md)
+### System Workflow
 
-### Downloading Official Releases
+The diagram below illustrates how client applications (browsers) route traffic through the local MASQ Node, hop through the decentralized mesh network, and reach destination servers:
 
-Releases will appear on our GitHub page - click on the badge above for the latest stable beta build, or go to our [Releases page](https://github.com/MASQ-Project/Node/releases/latest)
+```mermaid
+flowchart LR
+    subgraph LocalMachine ["User Local Machine"]
+        Browser["Web Browser / Apps"]
+        DNSUtil["dns_utility"]
+        Daemon["MASQ Daemon (:5333)"]
+        CLI["masq CLI / UI"]
+        NodeProc["MASQ Node Process"]
+        
+        Browser -->|"HTTP/HTTPS Proxy"| NodeProc
+        Browser -.->|"DNS Query (:53)"| NodeProc
+        CLI -->|"WebSocket (MASQNode-UIv2)"| Daemon
+        Daemon -->|"Spawns & Monitors"| NodeProc
+        CLI -.->|"Direct Control"| NodeProc
+        DNSUtil -->|"Configure System DNS"| Browser
+    end
 
-### Downloading the Latest Build
+    subgraph MeshNetwork ["MASQ Decentralized Mesh"]
+        Hop1["Intermediate Relay Node 1"]
+        Hop2["Intermediate Relay Node 2"]
+        Exit["Exit Node"]
+        
+        NodeProc -->|"Encrypted CORES Packets"| Hop1
+        Hop1 -->|"Encrypted CORES Packets"| Hop2
+        Hop2 -->|"Encrypted CORES Packets"| Exit
+    end
 
-If you want to try out the latest build, go to
-[our GitHub Actions continuous integration page](https://github.com/MASQ-Project/Node/actions) to see a list of builds.
-Look for the latest (uppermost) successful build: it'll have a white checkmark in a green circle next to it.
-
-![green check example](images/GreenCheck.png)
-
-Click on that link and scroll to the end of the page. You'll see a set of three artifact packages, one for each platform
-MASQ supports.
-
-![artifact packages examples](images/ArtifactPackages.png)
-
-Click the one that matches your platform; your browser will download a `.zip` file. Inside the `.zip` file are many
-things useful to developers, but you'll be interested in the executable binaries in `/generated/bin`.
-
-![contents of generated/bin](images/GeneratedBin.png)
-
-Make a directory somewhere on your system from which you'll run MASQ. You'll want to extract one or more files from
-`/generated/bin` in the `.zip` file into that directory.
-
-The most important file is `MASQNode`, or `MASQNode.exe` if you're using Windows. Definitely extract that one. It
-contains the code for both the MASQ Node and the MASQ Daemon.
-
-If you're using a graphical user interface for MASQ, that's all you'll need. If you're not, you'll probably also want
-`masq`, which is a command-line user interface.
-
-If the regular network-proxy setup doesn't work for you, you might want `dns_utility` as well to make it easy to
-subvert your system's DNS configuration.
-
-Finally, `automap` is a test utility used to check MASQ's automatic firewall penetration functionality against your
-particular router. Unless you've volunteered to help the MASQ dev team run tests, you won't need this.
-
-### Running from the Command Line
-
-These instructions assume you have the MASQ Node executable but not the MASQ GUI. (If you do, consult the GUI
-documentation about starting the Node on our [Testing Guides](https://docs.masq.ai/testing-guide)) You'll want to run the MASQ programs from wherever you expanded the
-`/generated/bin` path from the `.zip` file you downloaded.
-
-There are a number of ways to run the Node, but the way you'll probably want to use is to make sure the MASQ Daemon
-is started first. If the Daemon is not running in the background already, open a terminal window and start it by typing
-
-`$ sudo nohup ./MASQNode --initialization &`
-
-if you're working in Linux or macOS, or
-
-`$ start /b MASQNode --initialization`
-
-if you're using Windows.
-
-The Daemon's responsibility is to configure and start the Node. When it comes up, it sets up an initialization area
-that contains configuration data for the Node: some of it defaulted, some of it loaded from the environment, some
-loaded from a configuration file, if present, and the rest of it uninitialized. Before the Node is started, the
-configuration data in the Daemon's initialization area should be adjusted so that the Node has what it needs when it
-comes up.
-
-If you have no GUI, the simplest way to do this is with the `masq` command-line user interface. Once you have the 
-Daemon running, type
-
-`$ masq`
-
-at a handy command prompt. To learn how to use `masq` to set up and start the Node, type `help` at the `masq>` prompt,
-and pay special attention to the `setup` and `start` commands.
-
-If this is the first time you're starting the Node, you may also be interested in `set-password`, `create-wallets`, and
-`generate-wallets`.
-
-#### Supplying Configuration To MASQ Daemon
-
-There are four ways to get configuration information into the initialization area of the MASQ Daemon on startup. 
-In decreasing level of priority, these are:
-
-1. `masq`
-2. the Daemon's shell environment
-3. a configuration file
-4. defaults
-
-Any piece of configuration information can be provided through any of these channels, with one exception: the path to
-the configuration file cannot be taken from the configuration file. (It can be provided there, but it will never be
-taken from there.) Configuration information provided in the configuration file will supersede defaults, information 
-provided in the environment will supersede conflicting information provided in the configuration file, and information 
-provided via the UI will supersede conflicting information from all the other sources.
-
-##### UI
-
-This is the easiest. In this file, our documentation of the configuration options shows you how to provide them to 
-`masq` on the command line, either in interactive mode or in noninteractive mode. Keep in mind, though, that command 
-lines tend to be preserved by the operating system for display to users who want to see process lists. Therefore, the
-command line may not be the best place to specify sensitive or secret configuration information. (Nothing prevents you 
-from doing this, though, so be careful.)
-
-##### Shell Environment
-
-If you see that the UI accepts a command such as `setup --clandestine-port 1234`, then you can supply that same
-parameter in the environment by setting the `MASQ_CLANDESTINE_PORT` environment variable to `1234`. Note that you need
-to remove the initial `--` prefix, convert the name to all uppercase, change hyphens to underscores, and add a `MASQ_` 
-prefix to namespace the parameter against other applications that might look for a similar variable.
-
-##### Configuration File
-
-The configuration file, by default, resides in the data directory (see the `--data-directory` parameter for further
-information) and is named `config.toml`. If you leave the configuration file unspecified, this is where MASQ Node
-will look for it. If it's found, it will be used; if it's not, MASQ Node will act as though it had been found but empty.
-But if you want to use a different file, specify it either as `--config-file` in the Daemon setup or as `MASQ_CONFIG_FILE`
-in the environment. If you specify a relative filename, MASQ Node will look for the configuration file in the data
-directory; if you specify an absolute filename, MASQ Node will not use the data directory to find the configuration
-file.
-
-The configuration file should be in TOML format. TOML is a competitor to other formats like JSON and YAML, but the
-MASQ Node uses only scalar settings, not arrays or tables. If you see that Daemon setup accepts a command such
-as `setup --clandestine-port 1234`, then you can supply that same parameter in the configuration file by adding the
-following line to it:
-
-```
-clandestine-port = "1234"
+    subgraph Internet ["Clearnet & Blockchain"]
+        TargetServer["Destination Web Server"]
+        RPC["Web3 / Blockchain RPC Node"]
+        
+        Exit -->|"Decrypted Request"| TargetServer
+        NodeProc -.->|"Settlement & Accounts"| RPC
+        Exit -.->|"Settlement & Accounts"| RPC
+    end
 ```
 
-Note that you need to remove the initial `--` prefix. All the configuration parameters will work if you supply their
-values as double-quoted strings, but if they're numeric values, you can supply them numerically as well--for example,
+### Daemon vs. Node Security Model
 
-```
-clandestine-port = 1234
-```
+To protect against local privilege escalation:
+1. **The Daemon (`MASQNode --initialization`)**:
+   - Starts at system boot with administrative (root/elevated) privileges.
+   - Listens exclusively on `localhost` (default port `5333`) for UI connections (`masq` CLI or MASQ Browser).
+   - **Strictly isolated:** Never communicates over the public Internet and cannot process external mesh data.
+   - Responsible for initialization, environment validation, and spawning the Node process.
+2. **The Node (`MASQNode`)**:
+   - Launched by the Daemon.
+   - Briefly utilizes elevated privileges to bind necessary low network ports (e.g., DNS port `53`).
+   - Immediately drops all elevated privileges to a standard user (`--real-user`) before reading any packets from external network interfaces.
+   - Communicates with UIs via WebSocket protocol (`MASQNode-UIv2`).
 
-Keep in mind that a configuration file is persistent information: anyone who has or can gain read access to the file
-can read whatever's in it, whether MASQ Node is running or not. Therefore, the configuration file may not be the 
-best place to specify sensitive or secret configuration information. (Nothing prevents you from doing this, though, so 
-be careful.)
+### Workspace Subprojects
 
-#### Running a Decentralized MASQ Node Locally
+The repository is organized as a Cargo workspace with dedicated crates:
 
-##### Wallets
+| Subproject | Description | Primary Artifacts |
+| :--- | :--- | :--- |
+| [`node`](node) | Core MASQ Node and Daemon implementation | `MASQNode`, `MASQNodeW` (Windows), `node_lib` |
+| [`masq`](masq) | Official command-line user interface | `masq` (CLI binary) |
+| [`dns_utility`](dns_utility) | OS-agnostic utility to inspect, subvert, and revert system DNS | `dns_utility`, `dns_utilityw` |
+| [`automap`](automap) | Firewall and router traversal engine (UPnP, NAT-PMP, PCP) | `automap`, `automap_lib` |
+| [`ip_country`](ip_country) | Offline IP-to-Country geolocation database engine | `ip_country`, `ip_country_lib` |
+| [`masq_lib`](masq_lib) | Core shared types, constants, crypto, and schema definitions | `masq_lib` |
+| [`port_exposer`](port_exposer) | Network utility to forward meta-address `0.0.0.0` to loopback | `port_exposer` |
+| [`multinode_integration_tests`](multinode_integration_tests) | Docker-based integration test suite simulating multi-node networks | `multinode_integration_tests_lib`, `mock_node` |
+| [`test_utilities`](test_utilities) | Shared test fixtures, mock servers, and testing helpers | `test_utilities` |
 
-In order to run decentralized, MASQ Node needs at least an earning wallet (an Ethereum wallet into which other Nodes
-will make payments for the services your Node provides). If you plan to use your Node to consume data with a browser
-or other network application, it will also need to be configured with a funded consuming wallet (an Ethereum wallet
-from which it will make payments for the services other Nodes provide). If you want, you can use the same wallet for
-both earning and consuming, although this will allow an attacker to connect your network-forming Gossip traffic with your
-data traffic, if he wants.
+### Internal Node Subsystems
 
-MASQ only ever has to put money into your earning wallet, which means the Node only has to know its address. However,
-MASQ needs to pay money out of your consuming wallet; therefore the Node needs to know more about that one. Currently,
-we use the mnemonic seed, an optional "25th word" that serves the purpose of a password, and the derivation path.
+Inside the `node` crate, functionality is structured into modular actors and layers:
+- **`proxy_server`**: Inbound local proxy listening for HTTP/HTTPS requests from client browsers, packing requests into encrypted CORES packages.
+- **`hopper`**: Micro-routing engine responsible for unpacking CORES headers, verifying routing cryptograms, and forwarding packets to the next hop or local service.
+- **`neighborhood`**: Gossip protocol and peer management engine. Maintains neighborhood tables, measures peer latency/reputation, and selects multi-hop routing paths.
+- **`proxy_client`**: Handles exit operations. Translates decrypted CORES packages back into standard TCP/HTTP requests to target servers on the Internet, and repacks responses.
+- **`entry_dns`**: Local DNS interceptor that handles queries for domain names and directs lookups through mesh exit nodes.
+- **`accountant`**: Financial engine managing micro-transactions, tracking bandwidth debits and credits, checking peer solvency, and submitting blockchain payments.
+- **`ui_gateway`**: WebSocket server facilitating command-and-control communication between the Node/Daemon and connected UI clients.
 
-If you route other people's traffic without having an earning wallet set up, a default earning wallet will be
-used, in which case the funds you earn will go to MASQ instead of to you: so unless you're in a philanthropic mood,
-you should be sure to set up or specify your earning wallet before you route data.
+---
 
-##### Password
+## Prerequisites & Supported Platforms
 
-The Node keeps a database on disk where it stores various things, like persistent configuration data and accounting
-information.  In some cases, this information is sensitive, and if an attacker confiscated your computer and found
-the sensitive data, you or others could be put at risk. Therefore, all the security-sensitive data in the database is
-encrypted with a symmetric key. We call that key a password, and you're required to set it before you store any
-sensitive data in the database. There are no rules for how long the password must be or what it must contain--security
-of your data is your responsibility, not ours--but it needs to be present so that the database can be properly encrypted
-with it.
+### Supported Operating Systems
+- **Linux:** Ubuntu 20.04 / 22.04 LTS or newer (x86_64)
+- **macOS:** macOS 11 Big Sur, 12 Monterey, 13+ (Apple Silicon & Intel x86_64)
+- **Windows:** Windows 10 / 11 64-bit
 
-MASQ never stores the password anywhere on disk, only in memory; so A) you'll need to supply the password every time
-the Node starts, B) no one can tell you the password if you forget it, and C) forgetting it will mean that your
-database is useless, and you'll have to start it over.
+> *Note:* 32-bit platforms are not actively supported for building due to upstream toolchain limitations.
 
-##### Interactive `masq` vs Noninteractive `masq`
+### System Dependencies
+- **Rust Toolchain:** Stable 1.63.0+ (with `cargo`, `rustfmt`, and `clippy`)
+- **C Compiler & Build Tools:** `gcc`, `g++`, `make`, `pkg-config`
+- **OpenSSL:** Headers and development libraries (e.g., `libssl-dev` on Debian/Ubuntu)
+- **SQLite:** Handled via bundled `rusqlite` dependencies.
 
-The `masq` command-line interface can run two ways. If you just type
-
-```
-$ ./masq
-```
-
-at a command prompt, you'll be shown a `masq>` prompt, and the system will await a series of `masq` commands from you.
-But if you type something like
-
-```
-$ ./masq setup --log-level debug --clandestine-port 1234
-```
-
-then `masq` will start up, execute the command you gave it, and immediately terminate.
-
-This way, you can use interactive `masq` to give an impromptu series of commands to the Daemon and/or the Node, or you
-can write shell scripts to control the Daemon and/or the Node for special purposes, with those scripts containing
-noninteractive `masq` commands.
-
-##### Daemon vs. Node
-
-The MASQ Daemon and the MASQ Node are two different programs that share the same binary. If you start that binary with
-the `--initialization` parameter, it will become the Daemon; if you start it without the `--initialization` parameter,
-it will become the Node.
-
-MASQ is designed to be very difficult to hack, but it's intended to go up against government-level attackers, so there's
-always the possibility that they could have the funding to do something we didn't anticipate. If an attacker figures out
-how to hack into a computer running MASQ, we think it's very important that at least he doesn't find himself hacked
-into a process running with administrative privilege.
-
-Also, it's important that the user interface, whether command-line or graphical, be able to direct the Node to start
-without having administrative privilege. However, because of the network ports the Node has to initialize, it must at
-least start up with administrative privilege. It drops all special privileges before it reads any data from the network,
-though, so any attacker who manages to hack it over the network won't see those special privileges.
-
-These two requirements led to the development of the MASQ Daemon. The Daemon should start up with administrative
-privilege at system-boot time, and keep running--with that privilege--until the computer shuts down. In return for
-being a long-running privileged process, the Daemon is forbidden from A) accessing the network in any way, and B)
-communicating with the Node in any way other than starting its process. As long as these limitations are respected,
-even someone who successfully hacks into the Node will not be able to hack into the privileged Daemon.
-
-When the user interface (whether command-line or graphical) starts up, it connects first to the Daemon. There is a
-set of commands the UI can use to communicate with the Daemon, but this set is comparatively small. As long as the
-UI issues commands from that set, it will stay connected to the Daemon. At some point, the UI will probably issue
-a command the Daemon doesn't understand - if the Node is running then the Daemon will instruct the UI to
-drop its Daemon connection, create a new connection to the Node instead, and re-issue the unrecognized command so that
-the Node can execute it.
-
-Thereafter, the UI will be connected to the Node. It will not connect again to the Daemon unless the Node shuts down
-or crashes; then the UI will fall back to the Daemon (if it's still running) or exit (if it's not).
-
-##### Handy `masq` Subcommands
-
-`masq` has quite a few subcommands that you can use, both interactively and noninteractively. The best way to find
-out about these subcommands is to type
-
-`$ ./masq --help`
-
-noninteractively at a shell-command prompt, or
-
-`masq> help`
-
-interactively at a `masq` prompt.
-
-##### Neighbors
-
-If you're starting the very first MASQ Node in a MASQ network, then you don't have to tell your Node about
-any preexisting network; instead, other people who want to join that MASQ Network will have to tell their Nodes
-about your Node, which means you'll need to give them your Node descriptor.
-
-Otherwise, you'll need to specify `--neighbors` as part of your `masq setup` so that your Node will know how to join 
-the network that is already in place.
-
-However, if your machine has already recently been on the MASQ Network, and you're starting the Node up again, there's 
-a chance that at least some of the Nodes that were recently your neighbors are still up and can be recontacted; in that 
-case, the Daemon will read the Node descriptors of your former neighbors out of the database and pre-populate the
-`--neighbors` setup with them, and you might not have to enter anything manually.
-
-##### Enabling Contact
-
-In order to run decentralized, the MASQ Node _must_ know the IP address others can use to contact it. Therefore,
-you must supply `--ip`.
-
-Your home network is behind your internet provider's router and a public IP address. Other Nodes in the MASQ Network
-will contact your Node through your public IP address, requiring at least one port to be forwarded on your router. The 
-MASQ Node Gossip protocol "gossips" to other Nodes the clandestine port you are listening on, and it is that port 
-you will need to open. When your Node is started it will write its descriptor to the console and the log, giving the clandestine
-port it is using; you will need to forward that port from your router to your computer's IP address.
-
-Forwarding ports on your router is somewhat technical. At a minimum, you should know how to log in to your router in 
-order to make changes to its configuration. The process is interchangeably called forwarding a port, opening a port,
-or mapping a port, and may be labeled as such in the router's interface. Assigning a static IP address for your computer
-will make this process easier, as otherwise your IP address can change each time your computer restarts or you restart
-the network interface. There are many guides that you can find on the Internet by searching for "Port Forwarding" or
-"How to Port Forwarding". Here is an example: [PortForward.com](https://portforward.com)
-
-More information on the operation, care, and feeding of the Neighborhood is available
-[in the neighborhood_subproject](https://github.com/MASQ-Project/Node/tree/master/node/src/neighborhood).
-
-
-### Terminating a MASQ Node
-
-Terminating a MASQ Node may be more of a process than you expect. There are three things to consider.
-
-The most obvious is the MASQ Node itself. Terminating that is easy: just send it a shutdown message, with the GUI if 
-you have it, or with `masq` like this:
-
-```
-$ ./masq shutdown
+On Debian / Ubuntu:
+```bash
+sudo apt-get update
+sudo apt-get install -y build-essential pkg-config libssl-dev git
 ```
 
-noninteractively, or if you're interactive,
-
-```
-masq> shutdown
-```
-
-However, if you were using your Node to access the Internet--that is, to consume--your computer's network stack is now
-missing an important component, and it won't work anymore until you reconfigure it to operate without the Node.
-If you configured your proxy settings to use the Node as an HTTP proxy, you'll want to disable them, or revert them
-back to what they were before you started the Node. If you're using DNS subversion, you'll want to revert that:
-
-```
-$ sudo ./dns_utility revert
+On macOS:
+```bash
+xcode-select --install
 ```
 
-Third, you'll probably want to close the hole or holes in your router's firewall. Don't leave them open against the 
-next time you run: it's dangerous to leave open holes in your firewall to ports you're not actively using on purpose.
+---
 
-## Errors
+## Building from Source
 
-MASQ Node, like any other piece of software, can encounter obstacles it cannot overcome in the process of trying
-to do what you ask it to do.  It needs to be able to tell you about these insurmountable obstacles, but it lives in a
-place that makes this difficult.  If it were a Web browser, it would have a window on which to display error messages.
-If it were a Web server it could send data describing the errors to your browser to display. But it's neither of these
-things; instead, it's crowded into a place in the protocol stack where neither the browser nor the server expects it
-to exist.
+1. **Clone the Repository:**
+   ```bash
+   git clone https://github.com/MASQ-Project/Node.git masq-node
+   cd masq-node
+   ```
 
-Therefore, certain error messages are a bit awkward to display in the browser, especially if they involve TLS 
-connections. Let's look at how MASQ Node deals with certain kinds of errors.
+2. **Build the Entire Workspace:**
+   To build release binaries for all workspace components (`MASQNode`, `masq`, `dns_utility`, `automap`):
+   ```bash
+   cargo build --release --manifest-path node/Cargo.toml
+   cargo build --release --manifest-path masq/Cargo.toml
+   cargo build --release --manifest-path dns_utility/Cargo.toml
+   cargo build --release --manifest-path automap/Cargo.toml
+   ```
 
-### HTTP
+   Alternatively, execute the project-wide CI build script:
+   ```bash
+   ./ci/all.sh
+   ```
 
-An insecure HTTP connection is one that is based on a URL that begins with `http://` (as opposed to `https://`). The
-fact that it is insecure means that MASQ Node (and every other process that handles the data) can intrude on the
-data stream and make your browser display whatever they want it to, which may or may not be related to what the server
-on the other end of the connection intended.
+3. **Locate Compiled Binaries:**
+   - `node/target/release/MASQNode` (MASQ Node & Daemon)
+   - `masq/target/release/masq` (CLI client)
+   - `dns_utility/target/release/dns_utility` (DNS utility)
+   - `automap/target/release/automap` (NAT traversal utility)
 
-When errors occur, this is very useful for MASQ Node. If you request something from an HTTP server (and for some
-reason MASQ Node cannot relay your request to that server) or cannot relay the response from the server back to
-you, MASQ Node will instead impersonate the server and create a counterfeit response describing the error. This will be displayed
-to you instead of the server response it can't give you. (Don't worry: MASQ Node's impersonation of the server
-is deliberately very bad, so you can easily tell that the error is not coming from the server. You won't be misled).
-The error message will describe the problem and suggest ways it might be alleviated.
+### Pre-built Releases
+Pre-compiled binaries are available on the [GitHub Releases](https://github.com/MASQ-Project/Node/releases/latest) page, as well as CI build artifacts generated on [GitHub Actions](https://github.com/MASQ-Project/Node/actions).
 
-### TLS
+---
 
-TLS (spoken over connections based on URLs that begin with `https://`) is a much more difficult beast. Once a TLS 
-connection is set up between your browser and a server, MASQ Node cannot understand a single bit of the dataflow,
-and it cannot modify a single bit of it without your browser throwing red alerts and refusing to show you the modified
-data. This is good for you and your privacy, but it doesn't make it easy for MASQ Node to communicate with you
-via the browser.
+## Quick Start Guide
 
-There is a small exception.
+### 1. Starting the MASQ Daemon
 
-_Once a TLS connection is set up,_ it's completely secure. But _while_ it's being set up, before the encrypted tunnel has
-been established, there's a little MASQ Node can do. Specifically, it can inject what's called a TLS Alert into the
-stream of data, as long as it is injected very early. This TLS Alert has a single byte that MASQ Node can use to tell
-you about problems it has relaying your data. There are a number of predefined values this byte can take on, and
-MASQ Node has to pick one of these values: it can't make up its own.
+The Daemon must be started with administrative privileges to manage port bindings and initialization:
 
-If your browser is trying to load a page when the error occurs, you'll see a cryptic message in its window telling you
-that you're not going to get what you're after. The exact wording of the error depends on the exact type of the TLS
-Alert. If your browser is trying to communicate in the background when the error occurs, you probably won't see it on
-the screen; but if the browser stops responding, you can open its developer tools and check the JavaScript console; if
-MASQ Node sent a TLS Alert, you'll see it there.
+**Linux / macOS:**
+```bash
+sudo nohup ./target/release/MASQNode --initialization &
+```
 
-Since the concerns of the MASQ Node aren't precisely the same as the concerns of a TLS endpoint, the correspondence
-can't always be made exact, so here are some specific TLS Alert values that MASQ Node produces in specific 
-situations.
+**Windows (Administrator Command Prompt):**
+```cmd
+start /b MASQNode.exe --initialization
+```
 
-* Routing Failure - `internal_error`: If your Node is not yet "warmed up" enough in the MASQ Network to see a
-large enough neighborhood to be able to create a clandestine route that meets your specifications, it will raise a
-TLS `internal_error` Alert. This will probably be displayed by your browser as some sort of protocol error--which,
-strictly speaking, it is. If this happens, just wait awhile for your Node and the MASQ Network to Gossip with
-each other and spread around the necessary information. Then try reloading the page.
+The Daemon begins listening on `127.0.0.1:5333` for UI and CLI connections.
 
-* DNS Resolution Failure - `unrecognized_name`: Even though you contact websites at names like `google.com` and
-`twitter.com`, the real Internet operates on the basis of IP addresses (like `172.217.6.14` and `31.13.66.35`).
-Before it's useful for retrieving data, your server name has to be translated into an IP address. This is the job of a
-DNS server. Much of Internet censorship consists of crippling the DNS servers you have available to you so that they
-can't give you the correct IP address for the server name you're seeking. MASQ Node captures the DNS queries your
-browser makes and forwards them across the MASQ Network to some other Node that hopefully has access to a
-non-censored DNS server that _does_ know the IP address you want. But this is a complex task and it may fail. For
-example, perhaps you typed the server name wrong, and _nobody_ knows an IP address it matches. Or perhaps your
-MASQ Node guessed wrong, and the exit Node to which it forwarded your DNS query is also handicapped by a censored DNS
-and can't find it either. In either case, MASQ Node will send your browser a TLS `unrecognized_name` alert, which
-your browser will probably present to you as some form of can't-find-host error. If you reload the page, MASQ Node
-will try to select a different exit Node, if available--one that hasn't failed to resolve a DNS query--for the next 
-attempt, which might bring you better fortune. Of course, if you _have_ typed the name wrong, just reloading the page
-will take another innocent exit Node out of circulation and make it even harder for you to get where you want to go.
+### 2. Setting up Wallets and Password
 
-# Disclosure
+In a separate terminal, launch the `masq` interactive CLI:
+```bash
+./target/release/masq
+```
 
-We run tests on every push to `master` on these platforms:
-- Ubuntu 20.04 LTS Desktop 64-bit
-- MacOS High Sierra (currently testing on Big Sur)
-- Windows 10 64-bit
+Set your database encryption password:
+```text
+masq> set-password
+```
 
-MASQ Node doesn't reliably build on 32-bit Windows due to issues with the build tools for that platform. We 
-recommend using a 64-bit version to build.
+Create or import your cryptocurrency wallets:
+- **Generate new wallets:**
+  ```text
+  masq> generate-wallets
+  ```
+  *(Save the generated 24-word BIP-39 mnemonic seed phrase in a safe location!)*
+- **Recover existing wallets:**
+  ```text
+  masq> recover-wallets
+  ```
 
-We do plan to release binaries that will run on 32-bit Windows, but they will likely be built on 64-bit Windows.
+### 3. Configuring and Starting the Node
 
-Copyright (c) 2019-2024, MASQ Network
+Configure your node initialization settings:
+```text
+masq> setup --chain base-mainnet --blockchain-service-url https://mainnet.base.org --ip <YOUR_PUBLIC_IP> --clandestine-port 9342
+```
+
+Provide seed neighbors if connecting to an existing network:
+```text
+masq> setup --neighbors "masq://base-mainnet:ZjPLnb9RrgsRM1D9edqH8jx9DkbPZSWqqFqLnmdKhsk@112.55.78.0:7878"
+```
+
+Start the Node service:
+```text
+masq> start
+```
+
+Verify connection status:
+```text
+masq> connection-status
+masq> descriptor
+```
+
+### 4. Routing Traffic (Proxy & DNS Subversion)
+
+To browse through your MASQ Node:
+1. **Configure Browser HTTP Proxy:**
+   Set your browser's HTTP/HTTPS proxy to:
+   - Host: `127.0.0.1`
+   - Port: Proxy port displayed in node startup logs (or configured in setup).
+2. **Subvert System DNS (Optional):**
+   Direct all DNS lookups through the MASQ Node's encrypted mesh resolver:
+   ```bash
+   sudo ./target/release/dns_utility subvert
+   ```
+   Verify DNS status:
+   ```bash
+   ./target/release/dns_utility status
+   ```
+
+### 5. Clean Shutdown
+
+1. Revert DNS configuration:
+   ```bash
+   sudo ./target/release/dns_utility revert
+   ```
+2. Stop the Node from `masq`:
+   ```text
+   masq> shutdown
+   ```
+3. Disable any manual proxy settings in your browser or operating system.
+
+---
+
+## Configuration Reference
+
+### Configuration Priority
+
+MASQ Node resolves configuration options in the following order of precedence (highest to lowest):
+1. **Interactive / Non-interactive UI Command (`masq setup ...`)**
+2. **Shell Environment Variables (`MASQ_*`)**
+3. **Configuration File (`config.toml`)**
+4. **Compiled Defaults**
+
+### Configuration Parameters
+
+| Parameter | Environment Variable | Config File Key | Default | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| `--blockchain-service-url` | `MASQ_BLOCKCHAIN_SERVICE_URL` | `blockchain-service-url` | *None* (Required) | JSON-RPC endpoint for Ethereum/Base/Polygon. |
+| `--chain` | `MASQ_CHAIN` | `chain` | `base-mainnet` | Blockchain network (`base-mainnet`, `polygon-mainnet`, `eth-mainnet`, `base-sepolia`, `polygon-amoy`). |
+| `--ip` | `MASQ_IP` | `ip` | *None* (Required) | External public IPv4 address of the Node. |
+| `--clandestine-port` | `MASQ_CLANDESTINE_PORT` | `clandestine-port` | Dynamic | External listening port for Gossip and mesh traffic. |
+| `--neighbors` | `MASQ_NEIGHBORS` | `neighbors` | *None* | Comma-separated list of peer node descriptors. |
+| `--data-directory` | `MASQ_DATA_DIRECTORY` | `data-directory` | OS App Data | Persistent storage directory for database and configuration. |
+| `--config-file` | `MASQ_CONFIG_FILE` | *N/A* | `config.toml` | Path to persistent TOML configuration file. |
+| `--db-password` | `MASQ_DB_PASSWORD` | `db-password` | *None* | Encryption password for database and secret keys. |
+| `--earning-wallet` | `MASQ_EARNING_WALLET` | `earning-wallet` | *None* | Hex address (`0x...`) to receive routing rewards. |
+| `--consuming-private-key` | `MASQ_CONSUMING_PRIVATE_KEY` | `consuming-private-key` | *None* | 64-character private key for paying network fees (testing). |
+| `--gas-price` | `MASQ_GAS_PRICE` | `gas-price` | `30000000000` | Gas price (in wei) for on-chain settlement transactions. |
+| `--min-hops` | `MASQ_MIN_HOPS` | `min-hops` | `3` | Minimum number of routing hops across mesh. |
+| `--neighborhood-mode` | `MASQ_NEIGHBORHOOD_MODE` | `neighborhood-mode` | `standard` | Mode of operation: `standard` (mesh) or `zero-hop` (standalone/testing). |
+| `--mapping-protocol` | `MASQ_MAPPING_PROTOCOL` | `mapping-protocol` | `upnp` | Router port mapping protocol (`upnp`, `natpmp`, `pcp`, or `off`). |
+| `--dns-servers` | `MASQ_DNS_SERVERS` | `dns-servers` | `1.1.1.1,8.8.8.8` | Upstream DNS servers used by exit nodes. |
+| `--log-level` | `MASQ_LOG_LEVEL` | `log-level` | `info` | Logging verbosity (`trace`, `debug`, `info`, `warn`, `error`). |
+| `--ui-port` | `MASQ_UI_PORT` | `ui-port` | `5333` | Localhost port for Daemon UI WebSocket connections. |
+| `--real-user` | `MASQ_REAL_USER` | `real-user` | Current user | User identity to assume after dropping privileges. |
+| `--new-public-key` | `MASQ_NEW_PUBLIC_KEY` | `new-public-key` | `off` | Force regeneration of node identity public key (`on`/`off`). |
+| `--scans` | `MASQ_SCANS` | `scans` | `on` | Toggle periodic scans for payables and deadbeat peers. |
+
+### Node Descriptor Format
+
+Node descriptors follow the format:
+```text
+masq://<chain-identifier>:<base64-public-key>@<ip-address>:<clandestine-port>
+```
+Example:
+```text
+masq://base-mainnet:ZjPLnb9RrgsRM1D9edqH8jx9DkbPZSWqqFqLnmdKhsk@112.55.78.0:7878
+```
+
+### Sample `config.toml`
+
+Place this file in your data directory (or point to it via `--config-file`):
+
+```toml
+chain = "base-mainnet"
+blockchain-service-url = "https://mainnet.base.org"
+ip = "203.0.113.195"
+clandestine-port = 9342
+log-level = "info"
+min-hops = 3
+mapping-protocol = "upnp"
+dns-servers = "1.1.1.1,8.8.8.8"
+neighbors = "masq://base-mainnet:ZjPLnb9RrgsRM1D9edqH8jx9DkbPZSWqqFqLnmdKhsk@112.55.78.0:7878"
+```
+
+---
+
+## CLI Reference (`masq`)
+
+The `masq` utility can be operated interactively (launching `masq` without arguments) or non-interactively (`masq <subcommand> [flags]`):
+
+| Subcommand | Description |
+| :--- | :--- |
+| `setup` | Pre-configure Daemon initialization parameters before starting the Node. |
+| `start` | Instruct the Daemon to launch the Node process. |
+| `shutdown` | Gracefully shut down the running Node and/or Daemon. |
+| `configuration` | View the current active configuration values. |
+| `set-configuration` | Dynamically update runtime configuration parameters on a live Node. |
+| `connection-status` | Display status of peer connections, active hops, and network health. |
+| `descriptor` | Print the local Node's network descriptor for sharing with neighbors. |
+| `exit-location` | View or specify preferred exit node geographic locations. |
+| `financials` | Inspect accounts payable, accounts receivable, and token balances. |
+| `generate-wallets` | Generate new mnemonic seed and derived earning/consuming wallets. |
+| `recover-wallets` | Import existing wallets via BIP-39 mnemonic seed. |
+| `wallet-addresses` | Display configured public addresses for earning and consuming wallets. |
+| `set-password` | Set the initial database symmetric encryption password. |
+| `change-password` | Update existing database encryption password. |
+| `check-password` | Verify if the supplied password can decrypt the local database. |
+| `get-neighborhood-graph` | Output an ASCII representation of known mesh network topology. |
+| `scan` | Trigger an immediate manual scan for payables or peer status. |
+
+---
+
+## Testing
+
+The codebase includes extensive unit, integration, and multi-node network tests:
+
+```bash
+# Run unit tests across all workspace crates
+cargo test --workspace
+
+# Run tests for a specific crate
+cargo test -p node
+cargo test -p masq
+cargo test -p dns_utility
+
+# Run multi-node integration tests (requires Docker)
+./ci/multinode_integration_test.sh
+
+# Run code format and lint checks
+./ci/format.sh
+./ci/lint.sh
+```
+
+> [!NOTE]
+> Multi-node integration tests use the Docker network `integration_net` and must be run serially (`--test-threads=1`).
+
+---
+
+## Troubleshooting & Diagnostics
+
+### Port 53 Binding Failures
+
+If you encounter:
+```text
+thread 'main' panicked at 'Cannot bind socket to V4(0.0.0.0:53): Address already in use'
+```
+Another local DNS resolver (such as `systemd-resolved` on Linux or `Internet Connection Sharing` on Windows) is occupying port 53.
+- **Linux (`systemd-resolved`):** Disable stub listener by adding `DNSStubListener=no` to `/etc/systemd/resolved.conf` and restart `systemd-resolved`.
+- **See comprehensive guide:** [`node/docs/PORT_53.md`](node/docs/PORT_53.md).
+
+### TLS Alerts & Routing Errors
+
+Because MASQ Node operates below the application layer, it uses synthetic TLS Alerts during handshake negotiation to notify the browser of connection issues:
+- **`internal_error` (Routing Failure):** The local node has not yet discovered enough credible peers to assemble a path satisfying `--min-hops`. Wait 1-2 minutes for Gossip discovery to populate the neighborhood table.
+- **`unrecognized_name` (DNS Failure):** The requested hostname could not be resolved across exit nodes. Verify spelling or check if the exit node has unrestricted DNS access.
+
+### Router NAT & Port Forwarding
+
+MASQ nodes require incoming reachability on the configured clandestine port:
+- Check if your router supports UPnP or NAT-PMP (enabled by default via `--mapping-protocol upnp`).
+- Test router capability using the built-in `automap` test tool:
+  ```bash
+  cargo run --bin automap
+  ```
+- If UPnP fails, log into your router administration page and manually forward your clandestine port (e.g., `9342`) to your computer's local IPv4 address.
+
+---
+
+## Component Documentation
+
+For in-depth developer documentation of internal crates and modules, refer to:
+- [Blockchain Service Configuration](node/docs/Blockchain-Service.md)
+- [Port 53 Resolution Guide](node/docs/PORT_53.md)
+- [Daemon & UI IPC Protocol Specification](USER-INTERFACE-INTERFACE.md)
+- [`node/src/accountant`](node/src/accountant/README.md)
+- [`node/src/entry_dns`](node/src/entry_dns/README.md)
+- [`node/src/hopper`](node/src/hopper/README.md)
+- [`node/src/neighborhood`](node/src/neighborhood/README.md)
+- [`node/src/proxy_client`](node/src/proxy_client/README.md)
+- [`node/src/proxy_server`](node/src/proxy_server/README.md)
+- [`node/src/ui_gateway`](node/src/ui_gateway/README.md)
+- [`dns_utility`](dns_utility/README.md)
+- [`multinode_integration_tests`](multinode_integration_tests/tests/README.md)
+
+---
+
+## Origin & Attribution
+
+The MASQ project was originally forked from Substratum's Node project in October 2019 to maintain and advance decentralized mesh technology after Substratum ceased operations. All credit for the foundational idea and architectural design belongs to Substratum Services, Inc., preserved under the open-source GPL-3.0 license.
+
+---
+
+## License
+
+This project is licensed under the **GNU General Public License v3.0** (`GPL-3.0-only`). See the [LICENSE](LICENSE) file for details.
+
+Copyright (c) 2019-2024, MASQ Network and/or its affiliates. All rights reserved.
